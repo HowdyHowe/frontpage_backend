@@ -14,12 +14,16 @@ const loginSchema = z.object({
 
 const signupSchema = z.object({
     username    : z.string().min(5, "Username required minimum 5 characters"),
-    password    : z.string().min(8, "Password required minimum 8 characters")
+    password    : z.string().min(8, "Password required minimum 8 characters"),
+    confirm_password    : z.string().min(8, "Password required minimum 8 characters")
 })
 
 export const authSignup = async (req: Request, res: Response) => {
     try{
-        const { username, password } = signupSchema.parse(req.body);
+        const { username, password, confirm_password } = signupSchema.parse(req.body);
+
+        if (password !== confirm_password) return sendResponse(res, 401, "Invalid", { message: "Password and confirm password is not identical." })
+
         const user_id = await generateUserId();
 
         const hasedPassword = await bcrypt.hash(password, 10);
@@ -74,5 +78,38 @@ export const authLogin = async (req: Request, res: Response) => {
         }
 
         return sendResponse(res, 500, "Failed to logged in", { error: "An unexpected server error occurred while logging in" })
+    }
+}
+
+export const authLogout = async (req: Request, res: Response) => {
+    try {
+        res
+            .cookie("refreshToken", "", {
+                httpOnly: true,
+                // change secure when production
+                secure  : false,
+                sameSite: "strict",
+                maxAge  : 0
+            })
+            .cookie("accessToken", "", {
+                httpOnly: true,
+                // change secure when production
+                secure  : false,
+                sameSite: "strict",
+                maxAge  : 0
+            })
+            .cookie("role", "", {
+                httpOnly: true,
+                // change secure when production
+                secure  : false,
+                sameSite: "strict",
+                maxAge  : 0
+            })
+
+        return sendResponse(res, 200, "Successfully logout")
+    } catch (err: any) {
+        console.error("Error in userLogoutController: ", err)
+
+        return sendResponse(res, 500, "Failed to logged out", { error: "An unexpected server error occurred while logging out" });
     }
 }
