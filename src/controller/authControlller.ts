@@ -1,8 +1,10 @@
 import z from "zod";
 import bcrypt from "bcrypt";
+import * as authModel from "../model/authModel";
 import { Request, Response } from "express";
-import { sendResponse } from "../util/sendResponse";
 import { getUserModel } from "../model/authModel";
+import { generateUserId } from "../util/generateID";
+import { sendResponse } from "../util/sendResponse";
 import { generateToken } from "../util/generateToken";
 
 const loginSchema = z.object({
@@ -18,13 +20,22 @@ const signupSchema = z.object({
 export const authSignup = async (req: Request, res: Response) => {
     try{
         const { username, password } = signupSchema.parse(req.body);
+        const user_id = await generateUserId();
 
-        
+        const hasedPassword = await bcrypt.hash(password, 10);
+        const newUser = await authModel.createUserModel({ user_id: user_id, username: username, password: hasedPassword })
 
+        return sendResponse(res, 200, "Success", { user_id: newUser.user_id, username: newUser.username, created_at: newUser.created_at })
     } catch (err: any) {
         console.error("Error in authSignup: ", err);
 
+        if (err instanceof z.ZodError) {
+            const messages = err.issues.map((e) => e.message);
+            return sendResponse(res, 400, messages.join(", "));
+        }
+        if (err.code === "P2002") return sendResponse(res, 409, "Username already exist");
 
+        return sendResponse(res, 500, "Something went wrong");
     }
 }
 
